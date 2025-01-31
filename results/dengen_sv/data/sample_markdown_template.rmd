@@ -1,0 +1,226 @@
+---
+title: "Distribution of Structural Variants for sample_template"
+author: "Department of Genomic Medicine"
+date: '`r Sys.time()`'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r required_libraries, include = FALSE,echo=FALSE }
+library(ggplot2)
+library(knitr)
+library(reshape2)
+library(data.table)
+library(tools)
+library(venn)
+library(UpSetR)
+library(vcfR)
+```
+
+```{r read_data , echo=FALSE }
+sample_metrics<- read.delim("/ngc/projects2/gm/people/mauqua/dengen/results/dengen_sv/sample_template/analysis/sample_metrics", header = TRUE, sep = "\t")
+events_filtered<- read.delim("/ngc/projects2/gm/people/mauqua/dengen/results/dengen_sv/sample_template/analysis/number_events_sample.txt", header = TRUE, sep = "\t")
+sv_size<-read.delim("/ngc/projects2/gm/people/mauqua/dengen/results/dengen_sv/sample_template/analysis/size_distribution_events", header = TRUE, sep = "\t")
+#sv_size_chr<-read.delim("../data/sample_template/analysis/size_distribution_events_chr", header = TRUE, sep = "\t")
+sv_size_discovered<-read.delim("/ngc/projects2/gm/people/mauqua/dengen/results/dengen_sv/sample_template/analysis/sv_size_discovered", header = TRUE, sep = "\t")
+#sv_type_chr<-read.delim("../data/sample_template/analysis/sv_by_chr", header = TRUE, sep = "\t")
+paths <- file.path("/ngc/projects2/gm/people/mauqua/dengen/results/dengen_sv/sample_template/analysis/")
+#sv_annotation<-read.delim("../data/sample_template/analysis/annotation_counts", header = TRUE, sep = "\t")
+```
+
+
+# Sample metrics
+
+```{r family_metrics , echo=FALSE }
+kable(sample_metrics)
+```
+
+# Common events
+
+```{r common_venn_calc ,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,results = FALSE}
+
+###############
+## callers
+###############
+
+callers <- c("all", "manta", "delly", "lumpy", "gridss")
+
+#################
+## store all comparision in table
+#################
+
+tab <- merge(paths[1:2], callers[1])
+tab <- rbind(tab, merge(paths[3:4], callers[2:4]))
+names(tab) <- c("path", "callset")
+print(tab)
+
+###################
+## Select comparision 
+##################
+
+ri <- 1  # row index
+row <- tab[ri,]
+row
+
+#####################
+## 
+#####################
+
+sets <- read.table(file.path(row$path, paste0(row$callset, ".txt")), colClasses="character")
+
+if (ri < 3) {
+  sets <- toupper(gsub("(\\d+)\\/.*\\/(.*)", "\\2", file_path_sans_ext(sets$V1)))
+} else {
+  sets <- toupper(gsub("(\\d+)\\/.*\\/(.*)", "\\2-\\1", file_path_sans_ext(sets$V1)))
+}
+
+n.sets <- length(sets)
+
+vcf <- read.vcfR(file.path(row$path, paste0(row$callset, ".vcf")), verbose = FALSE)
+
+bin.vec <- sapply(strsplit(sapply(strsplit(getFIX(vcf, getINFO=TRUE)[, 'INFO'], ";"), function(x) {x[2]}), "="), function (x) {x[2]})
+
+sets.sz <- data.frame(matrix(ncol=2, nrow=n.sets))
+
+names(sets.sz) <- c("caller", "n")
+
+for (i in 1:n.sets) {
+  s <- rep(".",n.sets)
+  s <- paste(replace(s,i,1), collapse="")
+  re <- paste("^",s, "$", sep="")
+  caller <- sets[i]
+  n <- length(grep(s, bin.vec))
+  sets.sz[i,] <- c(caller, n)
+}
+
+vec <- table(sapply(bin.vec, function(x) {strtoi(x, base=2)}))
+
+lst <- strsplit(bin.vec, "")
+
+s <- as.character(seq(0, (2 ** n.sets - 1)))
+
+N <- sapply(s, function(x){vec[x]}, USE.NAMES=FALSE)
+
+N[is.na(N)] <- 0
+
+slabels <- paste0(sets.sz$caller, " (", sets.sz$n, ")")
+
+```
+
+
+```{r common_intersection_size_calc ,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,results = FALSE}
+
+
+nr <- length(lst)
+
+nc <- length(lst[[1]])
+
+M <- matrix(0, nrow=nr, ncol=nc)
+
+for (i in 1:nr) {
+  M[i, ] <- as.integer(lst[[i]])
+}
+
+#M
+
+sv <- data.frame(ID = getFIX(vcf)[, "ID"], M)
+
+#colnames(sv)
+
+colnames(sv)[-1] <- slabels
+
+```
+
+
+```{r common_intersection_size_viz ,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
+#sv
+
+upset(sv, nsets=n.sets, sets.bar.color="#56B4E9", order.by="freq")
+
+```
+
+## Number of ascertained Structural Variant events by sample
+
+In this figure we observe the total number of ascertained events, in the Y axis, labelled Count of ascertained Structural Variants, for the sample, in the X axis, labelled sample.
+
+```{r total_events_unfiltered_SV, echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
+ggplot (events_filtered, aes(x=SAMPLE,y=TOTAL, fill=SV))+
+  geom_bar(stat='identity', position='stack') + 
+  geom_text(aes(label=TOTAL), size = 3, position = position_stack(vjust = 0.5))+
+  xlab("Sample")+
+  ylab("Count of ascertained Structural Variants")+
+  labs(title = "Number of ascertained events per sample")
+```
+
+
+```{r total_events_unfiltered_SV_chr, echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
+
+
+## Number of ascertained Structural Variant events by sample by chromossome
+
+#In this figure we observe the total number of ascertained events, in the Y axis, labelled Count of ascertained Structural #Variants, for the sample, in the X axis, labelled sample.
+
+#ggplot (sv_type_chr, aes(x=CHR,y=TOTAL, fill=SV))+
+#  geom_bar(stat='identity', position='stack') + 
+#  geom_text(aes(label=TOTAL), size = 3, position = position_stack(vjust = 0.5))+
+#  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))+
+#  xlab("Sample")+
+#  ylab("Count of ascertained Structural Variants")+
+#  labs(title = "Number of ascertained events per sample")
+```
+
+## Structural Variant Size Distribution
+
+In this figure we observe the size distribution of ascertained SVs.
+
+```{r size_distribution_all_samples ,echo=FALSE, warning=FALSE ,message=FALSE,error=FALSE}
+ggplot(sv_size, aes(x=SAMPLE, y=SIZE,fill=SV)) +
+  scale_y_continuous(trans='log10',breaks=c(10,100,1000,10000,100000,1000000,10000000,100000000),labels = c("10bp","100bp","1k","10k","100K","1MB","10MB","100MB"))+
+  geom_boxplot(notch=TRUE)+
+  xlab("Sample")+
+  ylab("Ascertained Strucutral Variant Size")+
+  labs(title = "Structural Variant Size Distribution (bin width is uniform in log-scale)")
+```
+
+
+```{r size_distribution_all_samples_chr ,echo=FALSE, warning=FALSE ,message=FALSE,error=FALSE}
+## Structural Variant Size Distribution by chromossome
+
+#In this figure we observe the size distribution of ascertained SVs.
+
+
+#ggplot(sv_size_chr, aes(x=SAMPLE, y=SIZE,fill=SV)) +
+#  scale_y_continuous(trans='log10',breaks=c(10,100,1000,10000,100000,1000000,10000000,100000000),labels = c("10bp","100bp","1k","10k","100K","1MB","10MB","100MB"))+
+#  geom_boxplot(notch=TRUE)+
+#  xlab("Sample")+
+#  ylab("Ascertained Strucutral Variant Size")+
+#  labs(title = "Structural Variant Size Distribution (bin width is uniform in log-scale)")+
+#  facet_grid(rows = vars(CHR))
+```
+
+
+## Distribution of Discovered Events with the Structural Variant Size Across the Genome
+
+In this figure we observe the number of events, in the Y axis, labelled structural variant discovered, with the structural variant size, in the X axis, labelled structural variant size.
+
+```{r sv_number_size, echo=FALSE, warning=FALSE ,message=FALSE,error=FALSE}
+   ggplot(sv_size_discovered, aes(x=SIZE, y=COUNT)) +
+   geom_line(aes(color=SV))+
+   xlim(0, 50)+
+   #coord_cartesian(xlim = c(0,10000)) +
+   #scale_x_continuous(breaks=c(50,100,300,1000,10000)) +
+   #scale_y_continuous(trans='log10',breaks=c(10,100,1000,10000,100000,1000000,10000000,100000000),labels = c("10bp","100bp","1k","10k","100K","1MB","10MB","100MB")) +
+   scale_x_continuous(trans='log10',breaks=c(10,100,1000,10000,100000,1000000),labels = c("10bp","100bp","1k","10k","100K","1MB")) +
+   #scale_x_continuous(trans='log10',breaks=c(10,100,1000,10000,100000,1000000,10000000,100000000),labels = c("10bp","100bp","1k","10k","100K","1MB","10MB","100MB")) +
+   xlab("Strucutral Variant Size")+
+   ylab("Structural Variant Discovered")+
+   labs(title = "Structural Variant Size Distribution by strucutral Variant Discovered")
+```
+
