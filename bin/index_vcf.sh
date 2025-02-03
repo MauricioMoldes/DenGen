@@ -1,25 +1,23 @@
-
-
 #################
-## index file 
+## index VCF file 
 #################
 
 module load tabix/1.2.1
 
-#tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/dengen_2211_merged.snp_filtered.vcf.gz
-#tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/dengen_2211_merged.vcf.gz
+# Index each DenGen sample
 
-tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/1000g_dengen_2211_merged.snp_filtered.vcf.gz
-
-: ' 
-input="1000_genomes_grch38.target.paths.reheader"
+#!/bin/bash
+input="dengen_2211_list.paths"
 while IFS= read -r line
 do
   echo "$line"
-  tabix -p vcf ../data/1000genomes_grch38/"$line"
-  
-done < "$input"
+  filename=$(basename -- "$line")
+  extension="${filename##*.}"
+  filename="${filename%.*.*}"
 
-'
+
+tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/normalization/"$filename".normalized.vcf.gz 
+
+done < "$input"
 
 
