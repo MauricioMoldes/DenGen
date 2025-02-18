@@ -15,8 +15,10 @@ do
   extension="${filename##*.}"
   filename="${filename%.*.*}"
 
+if [ ! -f /ngc/projects2/gm/people/mauqua/dengen/results/normalization/"$filename".normalized.vcf.gz.tbi ]; then
+    tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/normalization/"$filename".normalized.vcf.gz 
 
-tabix -p vcf /ngc/projects2/gm/people/mauqua/dengen/results/normalization/"$filename".normalized.vcf.gz 
+fi 
 
 done < "$input"
 

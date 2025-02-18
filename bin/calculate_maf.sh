@@ -6,8 +6,8 @@
 
 module load tools perl vcftools/0.1.16
 
-VCF="/ngc/projects/gm/people/mauqua/dengen/results/dengen_2211_merged.vcf.gz"
-OUT="/ngc/projects/gm/people/mauqua/dengen/results/vcf_analysis"
+VCF="/ngc/projects/gm/people/mauqua/dengen/results/dengen_2211_merged.v2.vcf.gz"
+OUT="/ngc/projects/gm/people/mauqua/dengen/results/vcf_analysis_2"
 
 
 # Allele Frequency 

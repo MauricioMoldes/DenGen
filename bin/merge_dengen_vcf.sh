@@ -5,6 +5,9 @@
 
 module load bcftools/1.20
 
+
+rm /tmp/dengen_normalized.paths 
+
 input="dengen_list_of_samples.txt"
 while IFS= read -r line
 do
